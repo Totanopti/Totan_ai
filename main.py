@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, status
 from pydantic import BaseModel
 import keepa
-import openai
+from openai import OpenAI
 import requests
 import os
 import uuid
@@ -28,7 +28,7 @@ if not keepa_api_key or not openai_api_key or not optisage_api_url:
 
 # Initialize APIs
 keepa_api = keepa.Keepa(keepa_api_key)
-openai_client = openai.OpenAI(api_key=openai_api_key)
+openai_client = OpenAI(api_key=openai_api_key)
 
 # Session storage (use Redis or DB in production)
 active_sessions = {}
