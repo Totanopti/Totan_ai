@@ -29,7 +29,17 @@ if not keepa_api_key or not openai_api_key or not optisage_api_url:
 
 # Initialize APIs
 keepa_api = keepa.Keepa(keepa_api_key)
-openai_client = OpenAI()
+
+# Initialize OpenAI client safely
+try:
+    openai_client = OpenAI(api_key=openai_api_key)
+except TypeError as e:
+    # Fallback initialization if proxies cause issues
+    import httpx
+    openai_client = OpenAI(
+        api_key=openai_api_key,
+        http_client=httpx.Client()
+    )
 
 # Session storage (use Redis or DB in production)
 active_sessions = {}
@@ -337,7 +347,17 @@ class AmazonFBAAnalyzer:
         self.keepa_insights = None
         self.chat_history = []
         self.keepa_api = keepa_api
-        self.openai_client = openai_client
+        
+        # Initialize OpenAI client safely
+        try:
+            self.openai_client = OpenAI(api_key=openai_api_key)
+        except TypeError as e:
+            # Fallback initialization if proxies cause issues
+            import httpx
+            self.openai_client = OpenAI(
+                api_key=openai_api_key,
+                http_client=httpx.Client()
+            )
 
     def get_product_analysis(self, asin: str, cost_price: float, marketplaceId: int, isAmazonFulfilled: bool) -> Dict[str, Any]:
         products = self.keepa_api.query(asin)
