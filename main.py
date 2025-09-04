@@ -29,7 +29,7 @@ if not keepa_api_key or not openai_api_key or not optisage_api_url:
 
 # Initialize APIs
 keepa_api = keepa.Keepa(keepa_api_key)
-openai_client = OpenAI(api_key=openai_api_key)
+openai_client = OpenAI()
 
 # Session storage (use Redis or DB in production)
 active_sessions = {}
