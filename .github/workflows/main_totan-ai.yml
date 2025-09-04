@@ -2,7 +2,7 @@
 # More GitHub Actions for Azure: https://github.com/Azure/actions
 # More info on Python, GitHub Actions, and Azure App Service: https://aka.ms/python-webapps-actions
 
-name: Build and deploy Python app to Azure Web App - Totan-ai
+name: Build and deploy Python app to Azure Web App - Totan-Ai
 
 on:
   push:
@@ -58,14 +58,14 @@ jobs:
       - name: Login to Azure
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_533259E08FA449A4BBF09018725C1FA3 }}
-          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_8BA88378DBE240F3A4118581632EEC3B }}
-          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_8E59A813AC4A4934A9FF3025CD391E20 }}
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_23A437DA9ED6489B80CCC55E0CF1DF79 }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_064FCBA248A14A9F9C5DA95DDEF16903 }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_D2BFB58D58C44FC887E41A49EF42D1DA }}
 
       - name: 'Deploy to Azure Web App'
         uses: azure/webapps-deploy@v3
         id: deploy-to-webapp
         with:
-          app-name: 'Totan-ai'
+          app-name: 'Totan-Ai'
           slot-name: 'Production'
           
