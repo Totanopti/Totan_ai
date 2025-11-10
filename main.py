@@ -12,6 +12,11 @@ import pprint
 from datetime import datetime, timedelta
 import numpy as np
 
+# --- 1. ADD REDIS IMPORTS ---
+import redis
+import json
+# -----------------------------
+
 # Load environment variables
 load_dotenv()
 
@@ -41,10 +46,38 @@ except TypeError as e:
         http_client=httpx.Client()
     )
 
-# Session storage (use Redis or DB in production)
-active_sessions = {}
+# --- 2. REDIS CONNECTION SETUP ---
+REDIS_HOST = "20.68.174.109"
+REDIS_PORT = 6379
+REDIS_PASSWORD = "PlzRRlBmvI4klCGPBmSk"
 
-# Request models
+redis_client: Optional[redis.StrictRedis] = None
+SESSION_TTL_HOURS = 4 # Session expires after 4 hours
+
+@app.on_event("startup")
+def startup_event():
+    """Connect to Redis when the application starts."""
+    global redis_client
+    try:
+        redis_client = redis.StrictRedis(
+            host=REDIS_HOST,
+            port=REDIS_PORT,
+            password=REDIS_PASSWORD,
+            decode_responses=True, # Critical for getting strings back
+            ssl=False,
+            socket_timeout=5 # Use a 5-second timeout
+        )
+        redis_client.ping()
+        print("✅ Redis connection established successfully.")
+    except Exception as e:
+        print(f"❌ Redis connection failed: {e}. Session storage will NOT work.")
+        redis_client = None
+        # In a production setup, you might raise an error here to prevent startup
+# --- END REDIS SETUP ---
+
+# Session storage (OLD: active_sessions = {}) - NOW WE USE REDIS
+
+# Request models (No changes needed)
 class AnalyzeRequest(BaseModel):
     asin: str
     cost_price: float
@@ -55,8 +88,9 @@ class ChatRequest(BaseModel):
     session_id: str
     question: str
 
-# Optisage profitability API call
+# Optisage profitability API call (No changes needed)
 def call_optisage_profitability_api(asin, cost_price, marketplaceId=1, isAmazonFulfilled=False):
+    # ... (function body unchanged)
     headers = {
         "accept": "application/json",
         "content-type": "application/json"
@@ -72,8 +106,9 @@ def call_optisage_profitability_api(asin, cost_price, marketplaceId=1, isAmazonF
     data = response.json()
     return data['data']
 
-# Extract 30-day average sales rank
+# Extract 30-day average sales rank (No changes needed)
 def get_30_day_average_sales_rank(product):
+    # ... (function body unchanged)
     sales_rank_data = product.get('salesRanks', {}).get('SALES', [])
     stats = product.get('stats') or {}
     monthly_sales = stats.get('sales30', 0)
@@ -94,7 +129,7 @@ def get_30_day_average_sales_rank(product):
     else:
         return 200000
 
-# Demand scoring (0-1 scale)
+# Demand scoring (0-1 scale) (No changes needed)
 def estimate_demand_score(monthly_sales):
     if monthly_sales >= 300:
         return 1.0
@@ -103,7 +138,7 @@ def estimate_demand_score(monthly_sales):
     else:
         return 0.0
 
-# Profitability scoring (0-1 scale)
+# Profitability scoring (0-1 scale) (No changes needed)
 def calculate_profitability_score(roi, profit_margin):
     score = 0
     
@@ -127,8 +162,9 @@ def calculate_profitability_score(roi, profit_margin):
     
     return min(score, 1.0)
 
-# Keepa Chart Insight Extractor with NumPy array handling
+# Keepa Chart Insight Extractor (No changes needed)
 class KeepaChartInsights:
+    # ... (All static methods inside this class are unchanged)
     @staticmethod
     def extract_chart_insights(product: Dict) -> Dict[str, Any]:
         """Extract insights from Keepa charts handling NumPy arrays"""
@@ -145,11 +181,10 @@ class KeepaChartInsights:
 
     @staticmethod
     def analyze_demand_patterns(product: Dict) -> Dict:
-        """Analyze sales rank patterns handling NumPy arrays"""
+        # ... (unchanged logic)
         try:
             data = product.get('data', {})
-            
-            # Handle NumPy arrays properly
+            # ... (unchanged logic)
             sales_rank_data = data.get('SALES', [])
             sales_rank_times = data.get('SALES_time', [])
             
@@ -159,6 +194,7 @@ class KeepaChartInsights:
             if hasattr(sales_rank_times, 'tolist'):
                 sales_rank_times = sales_rank_times.tolist()
             
+            # ... (unchanged logic)
             current_rank = product.get('salesRank', 0)
             monthly_sales = product.get('stats', {}).get('sales30', 0)
 
@@ -167,7 +203,7 @@ class KeepaChartInsights:
             has_time_data = len(sales_rank_times) > 0 if hasattr(sales_rank_times, '__len__') else bool(sales_rank_times)
             
             if not has_sales_data or not has_time_data:
-                return {
+                 return {
                     "current_rank": current_rank,
                     "monthly_sales": monthly_sales,
                     "insight": "No historical sales rank data available",
@@ -233,7 +269,7 @@ class KeepaChartInsights:
 
     @staticmethod
     def analyze_pricing_strategy(product: Dict) -> Dict:
-        """Analyze pricing patterns handling NumPy arrays"""
+        # ... (unchanged logic)
         try:
             data = product.get('data', {})
             pricing_insights = {}
@@ -284,7 +320,7 @@ class KeepaChartInsights:
 
     @staticmethod
     def analyze_competition(product: Dict) -> Dict:
-        """Analyze competitive landscape handling NumPy arrays"""
+        # ... (unchanged logic)
         try:
             data = product.get('data', {})
             offers = product.get('offers', [])
@@ -323,7 +359,7 @@ class KeepaChartInsights:
 
     @staticmethod
     def extract_key_metrics(product: Dict) -> Dict:
-        """Extract key performance metrics"""
+        # ... (unchanged logic)
         try:
             stats = product.get('stats', {})
             reviews = product.get('reviews', {})
@@ -339,6 +375,7 @@ class KeepaChartInsights:
             }
         except Exception as e:
             return {"error": f"Key metrics extraction failed: {str(e)}"}
+
 
 # Amazon FBA Analyzer
 class AmazonFBAAnalyzer:
@@ -359,7 +396,27 @@ class AmazonFBAAnalyzer:
                 http_client=httpx.Client()
             )
 
+    # --- 3. ADD SERIALIZATION METHODS FOR REDIS ---
+    def get_session_data(self) -> Dict[str, Any]:
+        """Collects all necessary state for storage in Redis."""
+        # Note: pprint.pformat is used for the context but the actual data 
+        # stored here must be JSON serializable.
+        return {
+            "current_analysis": self.current_analysis,
+            "keepa_insights": self.keepa_insights,
+            "chat_history": self.chat_history,
+        }
+
+    def load_session_data(self, data: Dict[str, Any]):
+        """Loads state from Redis back into the instance."""
+        # Use .get() to safely handle cases where a key might be missing
+        self.current_analysis = data.get("current_analysis")
+        self.keepa_insights = data.get("keepa_insights")
+        self.chat_history = data.get("chat_history", [])
+    # --- END SERIALIZATION METHODS ---
+
     def get_product_analysis(self, asin: str, cost_price: float, marketplaceId: int, isAmazonFulfilled: bool) -> Dict[str, Any]:
+        # ... (function body unchanged)
         products = self.keepa_api.query(asin)
         if not products:
             return None
@@ -454,6 +511,7 @@ class AmazonFBAAnalyzer:
         return self.current_analysis
 
     def query_openai(self, prompt: str) -> str:
+        # ... (function body unchanged)
         """Enhanced query with Keepa chart context"""
         if not self.current_analysis:
             return "Please analyze a product first."
@@ -502,6 +560,9 @@ class AmazonFBAAnalyzer:
 @app.post("/analyze")
 async def analyze_product(request: AnalyzeRequest):
     try:
+        if not redis_client:
+             raise HTTPException(status_code=503, detail="Session service unavailable: Redis not connected.")
+
         analyzer = AmazonFBAAnalyzer()
         session_id = str(uuid.uuid4())
         analysis = analyzer.get_product_analysis(
@@ -511,7 +572,17 @@ async def analyze_product(request: AnalyzeRequest):
         if not analysis:
             raise HTTPException(status_code=404, detail="Product not found")
 
-        active_sessions[session_id] = analyzer
+        # --- 4. SAVE SESSION TO REDIS ---
+        session_data = analyzer.get_session_data()
+        session_json = json.dumps(session_data)
+        
+        # Store in Redis with a Time-To-Live (TTL)
+        redis_client.set(
+            session_id, 
+            session_json, 
+            ex=timedelta(hours=SESSION_TTL_HOURS) 
+        )
+        # --- END SAVE SESSION ---
 
         return {
             "session_id": session_id,
@@ -524,21 +595,54 @@ async def analyze_product(request: AnalyzeRequest):
             "is_profitable": analysis["is_profitable"]
         }
     except Exception as e:
+        # Catch and log the detailed error
+        print(f"Error in /analyze: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/chat")
 async def chat_analysis(request: ChatRequest):
     """Enhanced chat endpoint with Keepa chart insights"""
-    analyzer = active_sessions.get(request.session_id)
-    if not analyzer:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Invalid session")
+
+    if not redis_client:
+        raise HTTPException(status_code=503, detail="Session service unavailable: Redis not connected.")
+
+    # --- 5. RETRIEVE, UPDATE, AND SAVE SESSION ---
+    # 1. Retrieve the session JSON string from Redis
+    session_json = redis_client.get(request.session_id)
+    
+    if not session_json:
+        # This is the old error, now caused by a truly invalid or expired session
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Invalid or expired session ID.")
+    
+    # 2. Deserialize the JSON string
+    session_data = json.loads(session_json)
+    
+    # 3. Re-hydrate the analyzer instance
+    analyzer = AmazonFBAAnalyzer()
+    analyzer.load_session_data(session_data)
     
     try:
+        # 4. Process the request (updates chat_history)
         response = analyzer.query_openai(request.question)
+        
+        # 5. Get the updated state and current TTL
+        updated_session_data = analyzer.get_session_data()
+        ttl = redis_client.ttl(request.session_id) 
+        
+        # 6. Save the updated JSON back to Redis, keeping the same expiration time
+        redis_client.set(
+            request.session_id, 
+            json.dumps(updated_session_data), 
+            ex=ttl if ttl > 0 else timedelta(hours=SESSION_TTL_HOURS)
+        )
+        # --- END RETRIEVE/UPDATE/SAVE ---
+
         return {
             "session_id": request.session_id,
             "response": response,
             "chat_history": analyzer.chat_history[-4:]
         }
     except Exception as e:
-        raise HTTPException(500, detail=str(e))
+        # Catch and log the detailed error
+        print(f"Error in /chat: {str(e)}")
+        raise HTTPException(500, detail=f"Internal Server Error during chat: {str(e)}")
