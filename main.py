@@ -47,9 +47,9 @@ except TypeError as e:
     )
 
 # --- 2. REDIS CONNECTION SETUP ---
-REDIS_HOST = "20.68.174.109"
-REDIS_PORT = 6379
-REDIS_PASSWORD = "PlzRRlBmvI4klCGPBmSk"
+REDIS_HOST = "redis-18779.c84.us-east-1-2.ec2.redns.redis-cloud.com"
+REDIS_PORT = 18779
+REDIS_PASSWORD = "G3lqMjnjMCVSiyNxdrGvozwiTrlwNtN8"
 
 redis_client: Optional[redis.StrictRedis] = None
 SESSION_TTL_HOURS = 4 # Session expires after 4 hours
