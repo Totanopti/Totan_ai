@@ -1,4 +1,3 @@
-# redeploy test
 from fastapi import FastAPI, HTTPException, status
 from pydantic import BaseModel
 import keepa
@@ -46,10 +45,11 @@ except TypeError as e:
         http_client=httpx.Client()
     )
 
-# --- 2. REDIS CONNECTION SETUP ---
+# --- 2. REDIS CONNECTION SETUP (UPDATED) ---
 REDIS_HOST = "20.0.161.160"
 REDIS_PORT = 6379
 REDIS_PASSWORD = "G3lqMjnjMCVSiyNxdrGvozwiTrlwNtN8"
+REDIS_USERNAME = "optisage_admin" # <-- DEFINED THE USERNAME VARIABLE
 
 redis_client: Optional[redis.StrictRedis] = None
 SESSION_TTL_HOURS = 4 # Session expires after 4 hours
@@ -63,6 +63,7 @@ def startup_event():
             host=REDIS_HOST,
             port=REDIS_PORT,
             password=REDIS_PASSWORD,
+            username=REDIS_USERNAME, # <-- ADDED USERNAME ARGUMENT
             decode_responses=True, # Critical for getting strings back
             ssl=False,
             socket_timeout=5 # Use a 5-second timeout
@@ -197,15 +198,15 @@ class KeepaChartInsights:
             has_time_data = len(sales_rank_times) > 0 if hasattr(sales_rank_times, '__len__') else bool(sales_rank_times)
             
             if not has_sales_data or not has_time_data:
-                 return {
-                    "current_rank": current_rank,
-                    "monthly_sales": monthly_sales,
-                    "insight": "No historical sales rank data available",
-                    "data_available": {
-                        "SALES_length": len(sales_rank_data) if hasattr(sales_rank_data, '__len__') else 0,
-                        "SALES_time_length": len(sales_rank_times) if hasattr(sales_rank_times, '__len__') else 0
-                    }
-                }
+                return {
+                     "current_rank": current_rank,
+                     "monthly_sales": monthly_sales,
+                     "insight": "No historical sales rank data available",
+                     "data_available": {
+                         "SALES_length": len(sales_rank_data) if hasattr(sales_rank_data, '__len__') else 0,
+                         "SALES_time_length": len(sales_rank_times) if hasattr(sales_rank_times, '__len__') else 0
+                     }
+                 }
 
             # Ensure both arrays have the same length
             min_length = min(len(sales_rank_data), len(sales_rank_times))
@@ -547,7 +548,7 @@ class AmazonFBAAnalyzer:
 async def analyze_product(request: AnalyzeRequest):
     try:
         if not redis_client:
-             raise HTTPException(status_code=503, detail="Session service unavailable: Redis not connected.")
+            raise HTTPException(status_code=503, detail="Session service unavailable: Redis not connected.")
 
         analyzer = AmazonFBAAnalyzer()
         session_id = str(uuid.uuid4())
@@ -655,4 +656,3 @@ async def chat_analysis(request: ChatRequest):
         # Catch and log the detailed error
         print(f"Error in /chat: {str(e)}")
         raise HTTPException(500, detail=f"Internal Server Error during chat: {str(e)}")
-
