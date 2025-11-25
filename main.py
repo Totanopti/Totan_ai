@@ -90,7 +90,6 @@ class ChatRequest(BaseModel):
 
 # Optisage profitability API call (No changes needed)
 def call_optisage_profitability_api(asin, cost_price, marketplaceId=1, isAmazonFulfilled=False):
-    # ... (function body unchanged)
     headers = {
         "accept": "application/json",
         "content-type": "application/json"
@@ -108,7 +107,6 @@ def call_optisage_profitability_api(asin, cost_price, marketplaceId=1, isAmazonF
 
 # Extract 30-day average sales rank (No changes needed)
 def get_30_day_average_sales_rank(product):
-    # ... (function body unchanged)
     sales_rank_data = product.get('salesRanks', {}).get('SALES', [])
     stats = product.get('stats') or {}
     monthly_sales = stats.get('sales30', 0)
@@ -164,7 +162,6 @@ def calculate_profitability_score(roi, profit_margin):
 
 # Keepa Chart Insight Extractor (No changes needed)
 class KeepaChartInsights:
-    # ... (All static methods inside this class are unchanged)
     @staticmethod
     def extract_chart_insights(product: Dict) -> Dict[str, Any]:
         """Extract insights from Keepa charts handling NumPy arrays"""
@@ -181,10 +178,8 @@ class KeepaChartInsights:
 
     @staticmethod
     def analyze_demand_patterns(product: Dict) -> Dict:
-        # ... (unchanged logic)
         try:
             data = product.get('data', {})
-            # ... (unchanged logic)
             sales_rank_data = data.get('SALES', [])
             sales_rank_times = data.get('SALES_time', [])
             
@@ -194,7 +189,6 @@ class KeepaChartInsights:
             if hasattr(sales_rank_times, 'tolist'):
                 sales_rank_times = sales_rank_times.tolist()
             
-            # ... (unchanged logic)
             current_rank = product.get('salesRank', 0)
             monthly_sales = product.get('stats', {}).get('sales30', 0)
 
@@ -269,7 +263,6 @@ class KeepaChartInsights:
 
     @staticmethod
     def analyze_pricing_strategy(product: Dict) -> Dict:
-        # ... (unchanged logic)
         try:
             data = product.get('data', {})
             pricing_insights = {}
@@ -320,7 +313,6 @@ class KeepaChartInsights:
 
     @staticmethod
     def analyze_competition(product: Dict) -> Dict:
-        # ... (unchanged logic)
         try:
             data = product.get('data', {})
             offers = product.get('offers', [])
@@ -359,7 +351,6 @@ class KeepaChartInsights:
 
     @staticmethod
     def extract_key_metrics(product: Dict) -> Dict:
-        # ... (unchanged logic)
         try:
             stats = product.get('stats', {})
             reviews = product.get('reviews', {})
@@ -399,8 +390,6 @@ class AmazonFBAAnalyzer:
     # --- 3. ADD SERIALIZATION METHODS FOR REDIS ---
     def get_session_data(self) -> Dict[str, Any]:
         """Collects all necessary state for storage in Redis."""
-        # Note: pprint.pformat is used for the context but the actual data 
-        # stored here must be JSON serializable.
         return {
             "current_analysis": self.current_analysis,
             "keepa_insights": self.keepa_insights,
@@ -409,14 +398,12 @@ class AmazonFBAAnalyzer:
 
     def load_session_data(self, data: Dict[str, Any]):
         """Loads state from Redis back into the instance."""
-        # Use .get() to safely handle cases where a key might be missing
         self.current_analysis = data.get("current_analysis")
         self.keepa_insights = data.get("keepa_insights")
         self.chat_history = data.get("chat_history", [])
     # --- END SERIALIZATION METHODS ---
 
     def get_product_analysis(self, asin: str, cost_price: float, marketplaceId: int, isAmazonFulfilled: bool) -> Dict[str, Any]:
-        # ... (function body unchanged)
         products = self.keepa_api.query(asin)
         if not products:
             return None
@@ -511,7 +498,6 @@ class AmazonFBAAnalyzer:
         return self.current_analysis
 
     def query_openai(self, prompt: str) -> str:
-        # ... (function body unchanged)
         """Enhanced query with Keepa chart context"""
         if not self.current_analysis:
             return "Please analyze a product first."
@@ -584,16 +570,39 @@ async def analyze_product(request: AnalyzeRequest):
         )
         # --- END SAVE SESSION ---
 
-        return {
+        # --- UPDATED RESPONSE FORMAT WITH FIXED PRODUCT DATA ---
+        # Get the data from keepa_insights with proper fallbacks
+        key_metrics = analysis.get("keepa_insights", {}).get("key_metrics", {})
+        demand_analysis = analysis.get("keepa_insights", {}).get("demand_analysis", {})
+        competition_analysis = analysis.get("keepa_insights", {}).get("competition_analysis", {})
+
+        response_data = {
             "session_id": session_id,
-            "score": analysis["total_score"],
-            "category": analysis["category"],
-            "breakdown": analysis["score_breakdown"],
-            "roi": analysis["roi"],
-            "profit_margin": analysis["profit_margin"],
-            "monthly_sales": analysis["monthly_sales"],
-            "is_profitable": analysis["is_profitable"]
+            "summary": {
+                "overall_score": analysis["total_score"],
+                "category_rating": analysis["category"],
+                "title": analysis.get("title", "N/A")
+            },
+            "financials": {
+                "roi": analysis["roi"],
+                "profit_margin": analysis["profit_margin"],
+                "is_profitable": analysis["is_profitable"]
+            },
+            "product_data": {
+                "monthly_sales": analysis.get("monthly_sales", 0),  # Use the raw analysis value
+                "estimated_revenue": key_metrics.get("estimated_revenue", 0),
+                "review_count": key_metrics.get("review_count", 0),
+                "average_rating": key_metrics.get("average_rating", 0),
+                "sales_rank": demand_analysis.get("current_rank", 0),  # Use from demand_analysis
+                "offer_count": competition_analysis.get("total_competitors", 0),  # Use from competition_analysis
+                "is_amazon": key_metrics.get("is_amazon", False)
+            },
+            "score_breakdown": analysis["score_breakdown"]
         }
+
+        return response_data
+        # --- END UPDATED RESPONSE FORMAT ---
+
     except Exception as e:
         # Catch and log the detailed error
         print(f"Error in /analyze: {str(e)}")
@@ -646,3 +655,4 @@ async def chat_analysis(request: ChatRequest):
         # Catch and log the detailed error
         print(f"Error in /chat: {str(e)}")
         raise HTTPException(500, detail=f"Internal Server Error during chat: {str(e)}")
+
