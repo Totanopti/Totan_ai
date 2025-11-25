@@ -66,7 +66,7 @@ def startup_event():
             username=REDIS_USERNAME, # <-- ADDED USERNAME ARGUMENT
             decode_responses=True, # Critical for getting strings back
             ssl=False,
-            socket_timeout=5 # Use a 5-second timeout
+            socket_timeout=15 # Use a 5-second timeout
         )
         redis_client.ping()
         print("✅ Redis connection established successfully.")
