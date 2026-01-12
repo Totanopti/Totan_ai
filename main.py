@@ -16,7 +16,7 @@ import numpy as np
 import redis
 import json
 # -----------------------------
-
+# --- 1. ADD REDIS IMPORTS ---
 # Load environment variables
 load_dotenv()
 
