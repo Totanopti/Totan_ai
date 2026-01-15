@@ -48,10 +48,11 @@ except TypeError as e:
     )
 
 # --- 2. REDIS CONNECTION SETUP ---
-REDIS_HOST=redis-18404.c276.us-east-1-2.ec2.cloud.redislabs.com
-REDIS_PASSWORD=JLX0O2xJeFL1wGlfwJ9nIHnry1xyoFbe
-REDIS_PORT=18404
-REDIS_USERNAME=default
+REDIS_HOST = "redis-18404.c276.us-east-1-2.ec2.cloud.redislabs.com"
+REDIS_PORT = 18404
+REDIS_USERNAME = "default"
+REDIS_PASSWORD = "JLX0O2xJeFL1wGlfwJ9nIHnry1xyoFbe"
+
 
 
 
